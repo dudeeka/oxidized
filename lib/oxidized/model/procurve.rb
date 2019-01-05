@@ -1,10 +1,9 @@
 class Procurve < Oxidized::Model
-
   # some models start lines with \r
   # previous command is repeated followed by "\eE", which sometimes ends up on last line
-  prompt /^\r?([\w.-]+# )$/
+  prompt /^\r?([\w\s.-]+# )$/
 
-  comment  '! '
+  comment '! '
 
   # replace next line control sequence with a new line
   expect /(\e\[1M\e\[\??\d+(;\d+)*[A-Za-z]\e\[1L)|(\eE)/ do |data, re|
@@ -21,19 +20,43 @@ class Procurve < Oxidized::Model
     ""
   end
 
+  expect /Enter switch number/ do
+    send "\n"
+    ""
+  end
+
   cmd :all do |cfg|
-    cfg = cfg.each_line.to_a[1..-2].join
+    cfg = cfg.cut_both
     cfg = cfg.gsub /^\r/, ''
   end
 
   cmd :secret do |cfg|
-    cfg.gsub! /^(snmp-server community).*/, '\\1 <configuration removed>'
-    cfg.gsub! /^(snmp-server host).*/, '\\1 <configuration removed>'
-    cfg.gsub! /^(radius-server host).*/, '\\1 <configuration removed>'
+    cfg.gsub! /^(snmp-server community) \S+(.*)/, '\\1 <secret hidden> \\2'
+    cfg.gsub! /^(snmp-server host \S+) \S+(.*)/, '\\1 <secret hidden> \\2'
+    cfg.gsub! /^(radius-server host \S+ key) \S+(.*)/, '\\1 <secret hidden> \\2'
+    cfg.gsub! /^(radius-server key).*/, '\\1 <configuration removed>'
+    cfg.gsub! /^(tacacs-server host \S+ key) \S+(.*)/, '\\1 <secret hidden> \\2'
+    cfg.gsub! /^(tacacs-server key).*/, '\\1 <secret hidden>'
     cfg
   end
 
   cmd 'show version' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show modules' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show system power-supply' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show interfaces transceiver' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show flash' do |cfg|
     comment cfg
   end
 
@@ -45,7 +68,7 @@ class Procurve < Oxidized::Model
 
   # not supported on all models
   cmd 'show system information' do |cfg|
-    cfg = cfg.each_line.select { |line| not line.match /(.*CPU.*)|(.*Up Time.*)|(.*Total.*)|(.*Free.*)|(.*Lowest.*)|(.*Missed.*)/ }
+    cfg = cfg.each_line.reject { |line| line.match /(.*CPU.*)|(.*Up Time.*)|(.*Total.*)|(.*Free.*)|(.*Lowest.*)|(.*Missed.*)/ }
     cfg = cfg.join
     comment cfg
   end
@@ -58,6 +81,13 @@ class Procurve < Oxidized::Model
   end
 
   cfg :telnet, :ssh do
+    # preferred way to handle additional passwords
+    if vars :enable
+      post_login do
+        send "enable\n"
+        cmd vars(:enable)
+      end
+    end
     post_login 'no page'
     pre_logout "logout\ny\nn"
   end
@@ -65,5 +95,4 @@ class Procurve < Oxidized::Model
   cfg :ssh do
     pty_options({ chars_wide: 1000 })
   end
-
 end

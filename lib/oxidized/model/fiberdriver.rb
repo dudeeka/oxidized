@@ -3,7 +3,7 @@ class FiberDriver < Oxidized::Model
   comment "! "
 
   cmd :all do |cfg|
-    cfg.each_line.to_a[1..-2].join
+    cfg.cut_both
   end
   cmd 'show inventory' do |cfg|
     comment cfg
@@ -13,7 +13,7 @@ class FiberDriver < Oxidized::Model
     cfg.each_line.to_a[3..-1].join
     cfg.gsub! /^Building configuration.*$/, ''
     cfg.gsub! /^Current configuration:.*$$/, ''
-    cfg.gsub! /^! Configuration saved on .*$/, ''
+    cfg.gsub! /^! Configuration (saved|generated) on .*$/, ''
     cfg
   end
 

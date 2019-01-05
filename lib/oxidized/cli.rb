@@ -40,11 +40,16 @@ module Oxidized
     end
 
     def parse_opts
-      opts = Slop.new(:help=>true) do
+      opts = Slop.new(:help => true) do
         on 'd', 'debug', 'turn on debugging'
         on 'daemonize',  'Daemonize/fork the process'
+        on 'show-exhaustive-config', 'output entire configuration, including defaults' do
+          asetus = Config.load
+          puts asetus.to_yaml asetus.cfg
+          Kernel.exit
+        end
         on 'v', 'version', 'show version' do
-          puts Oxidized::VERSION
+          puts Oxidized::VERSION_FULL
           Kernel.exit
         end
       end
@@ -62,7 +67,7 @@ module Oxidized
     def write_pid
       if pidfile?
         begin
-          File.open(pidfile, ::File::CREAT | ::File::EXCL | ::File::WRONLY){|f| f.write("#{Process.pid}") }
+          File.open(pidfile, ::File::CREAT | ::File::EXCL | ::File::WRONLY) { |f| f.write("#{Process.pid}") }
           at_exit { File.delete(pidfile) if File.exists?(pidfile) }
         rescue Errno::EEXIST
           check_pid
@@ -85,8 +90,10 @@ module Oxidized
 
     def pid_status(pidfile)
       return :exited unless File.exists?(pidfile)
+
       pid = ::File.read(pidfile).to_i
       return :dead if pid == 0
+
       Process.kill(0, pid)
       :running
     rescue Errno::ESRCH

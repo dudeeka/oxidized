@@ -1,23 +1,28 @@
 class PowerConnect < Oxidized::Model
+  prompt /^([\w\s.@-]+(\(\S*\))?[#>]\s?)$/ # allow spaces in hostname..dell does not limit it.. #
 
-  prompt /^([\w\s.@-]+[#>]\s?)$/ # allow spaces in hostname..dell does not limit it.. #
-
-  comment  '! '
+  comment '! '
 
   expect /^\s*--More--\s+.*$/ do |data, re|
-     send ' '
-     data.sub re, ''
+    send ' '
+    data.sub re, ''
   end
 
   cmd :all do |cfg|
     cfg.each_line.to_a[1..-3].join
   end
 
+  cmd :secret do |cfg|
+    cfg.gsub! /^(username \S+ password (?:encrypted )?)\S+(.*)/, '\1<hidden>\2'
+    cfg.gsub! /^(tacacs-server key) \S+/, '\\1 <secret hidden>'
+    cfg
+  end
+
   cmd 'show version' do |cfg|
     if (@stackable.nil?)
       @stackable = true if cfg.match /(U|u)nit\s/
     end
-    cfg = cfg.split("\n").select { |line| not line[/Up\sTime/] }
+    cfg = cfg.split("\n").reject { |line| line[/Up\sTime/] }
     comment cfg.join("\n") + "\n"
   end
 
@@ -36,9 +41,11 @@ class PowerConnect < Oxidized::Model
   end
 
   cfg :telnet, :ssh do
-    if vars :enable
-      post_login do
-        send "enable\n"
+    post_login do
+      if vars(:enable) == true
+        cmd "enable"
+      elsif vars(:enable)
+        cmd "enable", /^[pP]assword:/
         cmd vars(:enable)
       end
     end
@@ -47,7 +54,6 @@ class PowerConnect < Oxidized::Model
     post_login "terminal length 0"
     pre_logout "logout"
     pre_logout "exit"
-    
   end
 
   def clean cfg
@@ -67,8 +73,8 @@ class PowerConnect < Oxidized::Model
       end
       out << line.strip
     end
+    out = out.reject { |line| line[/Up\sTime/] }
     out = comment out.join "\n"
     out << "\n"
   end
-
 end

@@ -6,8 +6,9 @@ module Oxidized
   class ModelNotFound  < OxidizedError; end
   class Node
     attr_reader :name, :ip, :model, :input, :output, :group, :auth, :prompt, :vars, :last, :repo
-    attr_accessor :running, :user, :msg, :from, :stats, :retry
+    attr_accessor :running, :user, :email, :msg, :from, :stats, :retry
     alias :running? :running
+
     def initialize opt
       Oxidized.logger.debug 'resolving DNS for %s...' % opt[:name]
       # remove the prefix if an IP Address is provided with one as IPAddr converts it to a network address.
@@ -15,11 +16,12 @@ module Oxidized
       Oxidized.logger.debug 'IPADDR %s' % ip_addr.to_s
       @name           = opt[:name]
       @ip             = IPAddr.new(ip_addr).to_s rescue nil
-      @ip           ||= Resolv.new.getaddress @name
+      @ip           ||= Resolv.new.getaddress(@name) if Oxidized.config.resolve_dns?
+      @ip           ||= @name
       @group          = opt[:group]
+      @model          = resolve_model opt
       @input          = resolve_input opt
       @output         = resolve_output opt
-      @model          = resolve_model opt
       @auth           = resolve_auth opt
       @prompt         = resolve_prompt opt
       @vars           = opt[:vars]
@@ -37,8 +39,9 @@ module Oxidized
         # don't try input if model is missing config block, we may need strong config to class_name map
         cfg_name = input.to_s.split('::').last.downcase
         next unless @model.cfg[cfg_name] and not @model.cfg[cfg_name].empty?
+
         @model.input = input = input.new
-        if config=run_input(input)
+        if config = run_input(input)
           Oxidized.logger.debug "lib/oxidized/node.rb: #{input.class.name} ran for #{name} successfully"
           status = :success
           break
@@ -54,7 +57,7 @@ module Oxidized
     def run_input input
       rescue_fail = {}
       [input.class::RescueFail, input.class.superclass::RescueFail].each do |hash|
-        hash.each do |level,errors|
+        hash.each do |level, errors|
           errors.each do |err|
             rescue_fail[err] = level
           end
@@ -63,23 +66,26 @@ module Oxidized
       begin
         input.connect(self) and input.get
       rescue *rescue_fail.keys => err
-        resc  = ''
+        resc = ''
         if not level = rescue_fail[err.class]
-          resc  = err.class.ancestors.find{|e|rescue_fail.keys.include? e}
+          resc  = err.class.ancestors.find { |e| rescue_fail.keys.include? e }
           level = rescue_fail[resc]
           resc  = " (rescued #{resc})"
         end
         Oxidized.logger.send(level, '%s raised %s%s with msg "%s"' % [self.ip, err.class, resc, err.message])
         return false
       rescue => err
-        file = Oxidized::Config::Crash + '.' + self.ip.to_s
-        open file, 'w' do |fh|
+        crashdir  = Oxidized.config.crash.directory
+        crashfile = Oxidized.config.crash.hostnames? ? self.name : self.ip.to_s
+        FileUtils.mkdir_p(crashdir) unless File.directory?(crashdir)
+
+        open File.join(crashdir, crashfile), 'w' do |fh|
           fh.puts Time.now.utc
           fh.puts err.message + ' [' + err.class.to_s + ']'
           fh.puts '-' * 50
           fh.puts err.backtrace
         end
-        Oxidized.logger.error '%s raised %s with msg "%s", %s saved' % [self.ip, err.class, err.message, file]
+        Oxidized.logger.error '%s raised %s with msg "%s", %s saved' % [self.ip, err.class, err.message, crashfile]
         return false
       end
     end
@@ -93,6 +99,7 @@ module Oxidized
         :model     => @model.class.to_s,
         :last      => nil,
         :vars      => @vars,
+        :mtime     => @stats.mtime,
       }
       h[:full_name] = [@group, @name].join('/') if @group
       if @last
@@ -120,8 +127,12 @@ module Oxidized
     end
 
     def reset
-      @user = @msg = @from = nil
+      @user = @email = @msg = @from = nil
       @retry = 0
+    end
+
+    def modified
+      @stats.update_mtime
     end
 
     private
@@ -166,12 +177,12 @@ module Oxidized
     end
 
     def resolve_repo opt
-      return unless is_git? opt
+      type = git_type opt
+      return nil unless type
 
-      remote_repo = Oxidized.config.output.git.repo
-
+      remote_repo = Oxidized.config.output.send(type).repo
       if remote_repo.is_a?(::String)
-        if Oxidized.config.output.git.single_repo? || @group.nil?
+        if Oxidized.config.output.send(type).single_repo? || @group.nil?
           remote_repo
         else
           File.join(File.dirname(remote_repo), @group + '.git')
@@ -181,20 +192,20 @@ module Oxidized
       end
     end
 
-    def resolve_key key, opt, global=nil
+    def resolve_key key, opt, global = nil
       # resolve key, first get global, then get group then get node config
       key_sym = key.to_sym
       key_str = key.to_s
       value   = global
       Oxidized.logger.debug "node.rb: resolving node key '#{key}', with passed global value of '#{value}' and node value '#{opt[key_sym]}'"
 
-      #global
+      # global
       if not value and Oxidized.config.has_key?(key_str)
         value = Oxidized.config[key_str]
         Oxidized.logger.debug "node.rb: setting node key '#{key}' to value '#{value}' from global"
       end
 
-      #group
+      # group
       if Oxidized.config.groups.has_key?(@group)
         if Oxidized.config.groups[@group].has_key?(key_str)
           value = Oxidized.config.groups[@group][key_str]
@@ -202,15 +213,25 @@ module Oxidized
         end
       end
 
-      #node
+      # model
+      if Oxidized.config.models.has_key?(@model.class.name.to_s.downcase)
+        if Oxidized.config.models[@model.class.name.to_s.downcase].has_key?(key_str)
+          value = Oxidized.config.models[@model.class.name.to_s.downcase][key_str]
+          Oxidized.logger.debug "node.rb: setting node key '#{key}' to value '#{value}' from model"
+        end
+      end
+
+      # node
       value = opt[key_sym] || value
       Oxidized.logger.debug "node.rb: returning node key '#{key}' with value '#{value}'"
       value
     end
 
-    def is_git? opt
-      (opt[:output] || Oxidized.config.output.default) == 'git'
-    end
+    def git_type opt
+      type = opt[:output] || Oxidized.config.output.default
+      return nil unless type[0..2] == "git"
 
+      type
+    end
   end
 end
