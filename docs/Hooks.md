@@ -36,6 +36,8 @@ OX_JOB_STATUS
 OX_JOB_TIME
 OX_REPO_COMMITREF
 OX_REPO_NAME
+OX_ERR_TYPE
+OX_ERR_REASON
 ```
 
 Exec hook recognizes the following configuration keys:
@@ -44,7 +46,7 @@ Exec hook recognizes the following configuration keys:
 * `async`: Execute the command in an asynchronous fashion. The main thread by default will wait for the hook command execution to complete. Set this to `true` for long running commands so node configuration pulls are not blocked. Default: `false`
 * `cmd`: command to run.
 
-### exec hook configuration example
+### Exec Hook configuration example
 
 ```yaml
 hooks:
@@ -60,7 +62,45 @@ hooks:
     timeout: 120
 ```
 
+### Exec Hook configuration example to send mail
+
+To send mail you need the package `msmtp` (It is pre-installed with the docker container) 
+
+You then need to update the `~/.msmtprc` file to contain your SMTP credentials like this:
+
+*Note: In the docker container the file is in /home/oxidized/.config/oxidized/.msmtprc so you can create the file if it doesn't exist in your oxidized config folder.*
+
+```cfg
+# Default settings
+defaults
+auth    on
+tls    on
+# Outlook SMTP
+account    mainaccount
+host       smtp.office365.com
+port       587
+from       user@domain.com
+user       user@domain.com
+password   edit-password
+
+account default : mainaccount
+```
+
+For non docker users this file should have the 600 permission, using: `chmod 600 .msmtprc` and the owner of the file should be the owner of oxidized `chown oxidized:oxidized .msmtprc`
+
+Then, you can configure Hooks to send mail like this:
+
+```yaml
+hooks:
+  send_mail_hook:
+    type: exec
+    events: [node_fail]
+    cmd: '/usr/bin/echo -e "Subject: [Oxidized] Error on node $OX_NODE_NAME \n\nThe device $OX_NODE_NAME has not been backed-up, reason: \n\n$OX_EVENT: $OX_ERR_REASON" | msmtp destination@domain.com'
+```
+
 ## Hook type: githubrepo
+
+Note: You must not use the same name as any local repo configured under output. Make sure your 'git' output has a unique name that does not match your remote_repo.
 
 The `githubrepo` hook executes a `git push` to a configured `remote_repo` when the specified event is triggered.
 
@@ -68,6 +108,7 @@ Several authentication methods are supported:
 
 * Provide a `password` for username + password authentication
 * Provide both a `publickey` and a `privatekey` for ssh key-based authentication
+* Provide only a `privatekey` (public key filename is assumed to be `privatekey` + "`.pub`"
 * Don't provide any credentials for ssh-agent authentication
 
 The username will be set to the relevant part of the `remote_repo` URI, with a fallback to `git`. It is also possible to provide one by setting the `username` configuration key.
@@ -79,10 +120,15 @@ For ssh key-based authentication, it is possible to set the environment variable
 * `remote_repo`: the remote repository to be pushed to.
 * `username`: username for repository auth.
 * `password`: password for repository auth.
-* `publickey`: public key file path for repository auth.
+* `publickey`: public key file path for repository auth. (optional)
 * `privatekey`: private key file path for repository auth.
+  * NOTE: this key needs to be in the legacy PEM format, not the newer OpenSSL format [#1877](https://github.com/ytti/oxidized/issues/1877), [#2324](https://github.com/ytti/oxidized/issues/2324)
+    * To convert a key beginning with `BEGIN OPENSSH PRIVATE KEY` to the legacy PEM format, run this command:
+      `ssh-keygen -p -m PEM -f $MY_KEY_HERE`
 
-When using groups, each group must have a unique entry in the `remote_repo` config.
+When using groups, `remote_repo` must be a dictionary of groups that the hook should apply to. If a group is missing from the dictionary, no action will be taken.
+
+The dictionary entry can either be a url alone:
 
 ```yaml
 hooks:
@@ -92,6 +138,25 @@ hooks:
       switches: git@git.intranet:oxidized/switches.git
       firewalls: git@git.intranet:oxidized/firewalls.git
 ```
+
+... or it can be a dictionary with `url` and `privatekey` specified:
+
+```yaml
+hooks:
+  push_to_remote:
+    remote_repo:
+      routers:
+        url: git@git.intranet:oxidized/routers.git
+        privatekey: /root/.ssh/id_rsa_routers
+      switches:
+        url: git@git.intranet:oxidized/switches.git
+        privatekey: /root/.ssh/id_rsa_switches
+      firewalls:
+        url: git@git.intranet:oxidized/firewalls.git
+        privatekey: /root/.ssh/id_rsa_firewalls
+```
+
+Both forms can be mixed and matched.
 
 ### githubrepo hook configuration example
 
@@ -150,12 +215,12 @@ Your AWS credentials should be stored in `~/.aws/credentials`.
 
 ## Hook type: slackdiff
 
-The `slackdiff` hook posts colorized config diffs to a [Slack](http://www.slack.com) channel of your choice. It only triggers for `post_store` events.
+The `slackdiff` hook posts colorized config diffs to a [Slack](https://www.slack.com) channel of your choice. It only triggers for `post_store` events.
 
-You will need to manually install the `slack-api` gem on your system:
+You will need to manually install the `slack-ruby-client` gem on your system:
 
 ```shell
-gem install slack-api
+gem install slack-ruby-client
 ```
 
 ### slackdiff hook configuration example
@@ -168,7 +233,8 @@ hooks:
     token: SLACK_BOT_TOKEN
     channel: "#network-changes"
 ```
-The token parameter is a "legacy token" and is generated [Here](https://api.slack.com/custom-integrations/legacy-tokens).
+
+The token parameter is a Slack API token that can be generated following [this tutorial](https://api.slack.com/tutorials/tracks/getting-a-token).  Until Slack stops supporting them, legacy tokens can also be used.
 
 Optionally you can disable snippets and post a formatted message, for instance linking to a commit in a git repo. Named parameters `%{node}`, `%{group}`, `%{model}` and `%{commitref}` are available.
 

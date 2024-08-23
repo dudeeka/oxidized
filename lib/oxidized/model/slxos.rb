@@ -1,4 +1,6 @@
 class SLXOS < Oxidized::Model
+  using Refinements
+
   prompt /^.*[>#]\s?$/i
   comment '! '
 
@@ -10,8 +12,9 @@ class SLXOS < Oxidized::Model
   end
 
   cmd 'show chassis' do |cfg|
-    cfg.encode!("UTF-8", :invalid => :replace, :undef => :replace) # sometimes ironware returns broken encoding
+    cfg.encode!("UTF-8", invalid: :replace, undef: :replace) # sometimes ironware returns broken encoding
     cfg.gsub! /.*Power Usage.*/, '' # remove unwanted lines power usage
+    cfg.gsub! /^Update:.*$/, '' # remove unwanted current date
     cfg.gsub! /Time A(live|wake).*/, '' # remove unwanted lines time alive/awake
     cfg.gsub! /([\[]*)1([\]]*)<->([\[]*)2([\]]*)(<->([\[]*)3([\]]*))*/, ''
 
@@ -28,7 +31,7 @@ class SLXOS < Oxidized::Model
 
   cmd 'show slots' do |cfg|
     cfg.gsub! /^-*^$/, '' # some slx devices are fixed config
-    cfg.gsub! /syntax error: element does not exist/, '' # same as above
+    cfg.gsub! "syntax error: element does not exist", '' # same as above
 
     comment cfg
   end

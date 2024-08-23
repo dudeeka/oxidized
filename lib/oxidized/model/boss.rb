@@ -1,11 +1,13 @@
 class Boss < Oxidized::Model
+  using Refinements
+
   # Extreme Baystack Operating System Software(BOSS)
   # Created by danielcoxman@gmail.com
   # May 15, 2017
   # This was tested on ers3510, ers5530, ers4850, ers5952
   # ssh and telnet were tested with banner and without
 
-  comment  '! '
+  comment '! '
 
   prompt /^[^\s#>]+[#>]$/
 
@@ -37,7 +39,7 @@ class Boss < Oxidized::Model
 
   # Do a sys-info and check and see if it supports stack
   cmd 'show sys-info' do |cfg|
-    @stack = true if cfg.match /Stack/
+    @stack = true if cfg =~ /Stack/
     cfg.gsub! /(^((.*)sysUpTime(.*))$)/, 'removed sysUpTime'
     cfg.gsub! /(^((.*)sysNtpTime(.*))$)/, 'removed sysNtpTime'
     cfg.gsub! /(^((.*)sysRtcTime(.*))$)/, 'removed sysNtpTime'

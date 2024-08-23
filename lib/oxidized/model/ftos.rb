@@ -1,4 +1,6 @@
 class FTOS < Oxidized::Model
+  using Refinements
+
   # Force10 FTOS model #
 
   comment  '! '
@@ -18,7 +20,7 @@ class FTOS < Oxidized::Model
 
   cmd 'show inventory' do |cfg|
     # Old versions of FTOS can occasionally return data that triggers encoding errors.
-    cfg.encode!("UTF-8", :invalid => :replace, :undef => :replace, :replace => "")
+    cfg.encode!("UTF-8", invalid: :replace, undef: :replace, replace: "")
     comment cfg
   end
 

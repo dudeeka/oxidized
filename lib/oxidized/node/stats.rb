@@ -2,15 +2,16 @@ module Oxidized
   class Node
     class Stats
       attr_reader :mtimes
+
       MAX_STAT = 10
 
       # @param [Job] job job whose information add to stats
       # @return [void]
-      def add job
+      def add(job)
         stat = {
-          :start  => job.start,
-          :end    => job.end,
-          :time   => job.time,
+          start: job.start,
+          end:   job.end,
+          time:  job.time
         }
         @stats[job.status] ||= []
         @stats[job.status].shift if @stats[job.status].size > @history_size
@@ -20,11 +21,11 @@ module Oxidized
 
       # @param [Symbol] status stats for specific status
       # @return [Hash,Array] Hash of stats for every status or Array of stats for specific status
-      def get status = nil
+      def get(status = nil)
         status ? @stats[status] : @stats
       end
 
-      def get_counter counter = nil
+      def get_counter(counter = nil)
         counter ? @stats[:counter][counter] : @stats[:counter]
       end
 

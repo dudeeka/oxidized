@@ -1,13 +1,14 @@
 module Oxidized
   class PromptUndetect < OxidizedError; end
+
   class Input
     include Oxidized::Config::Vars
 
-    RescueFail = {
-      :debug => [
-        Errno::ECONNREFUSED,
+    RESCUE_FAIL = {
+      debug: [
+        Errno::ECONNREFUSED
       ],
-      :warn => [
+      warn:  [
         IOError,
         PromptUndetect,
         Timeout::Error,
@@ -15,8 +16,8 @@ module Oxidized
         Errno::EHOSTUNREACH,
         Errno::ENETUNREACH,
         Errno::EPIPE,
-        Errno::ETIMEDOUT,
-      ],
-    }
+        Errno::ETIMEDOUT
+      ]
+    }.freeze
   end
 end

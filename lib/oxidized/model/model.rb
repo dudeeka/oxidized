@@ -3,29 +3,44 @@ require_relative 'outputs'
 
 module Oxidized
   class Model
+    using Refinements
+
     include Oxidized::Config::Vars
 
     class << self
-      def inherited klass
-        klass.instance_variable_set '@cmd',   Hash.new { |h, k| h[k] = [] }
-        klass.instance_variable_set '@cfg',   Hash.new { |h, k| h[k] = [] }
-        klass.instance_variable_set '@procs', Hash.new { |h, k| h[k] = [] }
-        klass.instance_variable_set '@expect', []
-        klass.instance_variable_set '@comment', nil
-        klass.instance_variable_set '@prompt', nil
+      def inherited(klass)
+        super
+        if klass.superclass == Oxidized::Model
+          klass.instance_variable_set '@cmd',     (Hash.new { |h, k| h[k] = [] })
+          klass.instance_variable_set '@cfg',     (Hash.new { |h, k| h[k] = [] })
+          klass.instance_variable_set '@procs',   (Hash.new { |h, k| h[k] = [] })
+          klass.instance_variable_set '@expect',  []
+          klass.instance_variable_set '@comment', nil
+          klass.instance_variable_set '@prompt',  nil
+        else # we're subclassing some existing model, take its variables
+          instance_variables.each do |var|
+            iv = instance_variable_get(var)
+            klass.instance_variable_set var, iv.dup
+            @cmd[:cmd] = iv[:cmd].dup if var.to_s == "@cmd"
+          end
+        end
       end
 
-      def comment _comment = '# '
-        return @comment if @comment
-
-        @comment = block_given? ? yield : _comment
+      def comment(str = "# ")
+        @comment = if block_given?
+                     yield
+                   elsif not @comment
+                     str
+                   else
+                     @comment
+                   end
       end
 
-      def prompt _prompt = nil
-        @prompt or @prompt = _prompt
+      def prompt(regex = nil)
+        @prompt = regex || @prompt
       end
 
-      def cfg *methods, **args, &block
+      def cfg(*methods, **args, &block)
         [methods].flatten.each do |method|
           process_args_block(@cfg[method.to_s], args, block)
         end
@@ -35,21 +50,21 @@ module Oxidized
         @cfg
       end
 
-      def cmd _cmd = nil, **args, &block
-        if _cmd.class == Symbol
-          process_args_block(@cmd[_cmd], args, block)
+      def cmd(cmd_arg = nil, **args, &block)
+        if cmd_arg.instance_of?(Symbol)
+          process_args_block(@cmd[cmd_arg], args, block)
         else
-          process_args_block(@cmd[:cmd], args, [_cmd, block])
+          process_args_block(@cmd[:cmd], args, [cmd_arg, block])
         end
-        Oxidized.logger.debug "lib/oxidized/model/model.rb Added #{_cmd} to the commands list"
+        Oxidized.logger.debug "lib/oxidized/model/model.rb Added #{cmd_arg} to the commands list"
       end
 
       def cmds
         @cmd
       end
 
-      def expect re, **args, &block
-        process_args_block(@expect, args, [re, block])
+      def expect(regex, **args, &block)
+        process_args_block(@expect, args, [regex, block])
       end
 
       def expects
@@ -63,7 +78,7 @@ module Oxidized
       # @since 0.0.39
       # @yield expects block which should return [String]
       # @return [void]
-      def pre **args, &block
+      def pre(**args, &block)
         process_args_block(@procs[:pre], args, block)
       end
 
@@ -74,22 +89,25 @@ module Oxidized
       # @since 0.0.39
       # @yield expects block which should return [String]
       # @return [void]
-      def post **args, &block
+      def post(**args, &block)
         process_args_block(@procs[:post], args, block)
       end
 
       # @author Saku Ytti <saku@ytti.fi>
       # @since 0.0.39
       # @return [Hash] hash proc procs :pre+:post to be prepended/postfixed to output
-      def procs
-        @procs
-      end
+      attr_reader :procs
 
       private
 
       def process_args_block(target, args, block)
         if args[:clear]
-          target.replace([block])
+          if block.instance_of?(Array)
+            target.reject! { |k, _| k == block[0] }
+            target.push(block)
+          else
+            target.replace([block])
+          end
         else
           method = args[:prepend] ? :unshift : :push
           target.send(method, block)
@@ -99,21 +117,21 @@ module Oxidized
 
     attr_accessor :input, :node
 
-    def cmd string, &block
+    def cmd(string, &block)
       Oxidized.logger.debug "lib/oxidized/model/model.rb Executing #{string}"
       out = @input.cmd(string)
       return false unless out
 
       out = out.b unless Oxidized.config.input.utf8_encoded?
       self.class.cmds[:all].each do |all_block|
-        out = instance_exec Oxidized::String.new(out), string, &all_block
+        out = instance_exec out, string, &all_block
       end
       if vars :remove_secret
         self.class.cmds[:secret].each do |all_block|
-          out = instance_exec Oxidized::String.new(out), string, &all_block
+          out = instance_exec out, string, &all_block
         end
       end
-      out = instance_exec Oxidized::String.new(out), &block if block
+      out = instance_exec out, &block if block
       process_cmd_output out, string
     end
 
@@ -121,12 +139,12 @@ module Oxidized
       @input.output
     end
 
-    def send data
+    def send(data)
       @input.send data
     end
 
-    def expect re, &block
-      self.class.expect re, &block
+    def expect(...)
+      self.class.expect(...)
     end
 
     def cfg
@@ -137,14 +155,10 @@ module Oxidized
       self.class.prompt
     end
 
-    def expects data
+    def expects(data)
       self.class.expects.each do |re, cb|
         if data.match re
-          if cb.arity == 2
-            data = instance_exec [data, re], &cb
-          else
-            data = instance_exec data, &cb
-          end
+          data = cb.arity == 2 ? instance_exec([data, re], &cb) : instance_exec(data, &cb)
         end
       end
       data
@@ -169,10 +183,28 @@ module Oxidized
       outputs
     end
 
-    def comment _comment
+    def comment(str)
       data = ''
-      _comment.each_line do |line|
+      str.each_line do |line|
         data << self.class.comment << line
+      end
+      data
+    end
+
+    def xmlcomment(str)
+      # XML Comments start with <!-- and end with -->
+      #
+      # Because it's illegal for the first or last characters of a comment
+      # to be a -, i.e. <!--- or ---> are illegal, and also to improve
+      # readability, we add extra spaces after and before the beginning
+      # and end of comment markers.
+      #
+      # Also, XML Comments must not contain --. So we put a space between
+      # any double hyphens, by replacing any - that is followed by another -
+      # with '- '
+      data = ''
+      str.each_line do |_line|
+        data << '<!-- ' << str.gsub(/-(?=-)/, '- ').chomp << " -->\n"
       end
       data
     end
@@ -183,10 +215,9 @@ module Oxidized
 
     private
 
-    def process_cmd_output output, name
-      output = Oxidized::String.new output if ::String === output
-      output = Oxidized::String.new '' unless Oxidized::String === output
-      output.set_cmd(name)
+    def process_cmd_output(output, name)
+      output = String.new('') unless output.instance_of?(String)
+      output.process_cmd(name)
       output
     end
   end

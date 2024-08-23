@@ -1,5 +1,7 @@
 class Netonix < Oxidized::Model
-  prompt /^[\w\s.@_\/:-]+#/
+  using Refinements
+
+  prompt /^[\w\s\(\).@_\/:-]+#/
 
   cmd :all do |cfg|
     cfg.cut_both

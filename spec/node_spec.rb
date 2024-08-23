@@ -1,36 +1,37 @@
-require 'spec_helper'
+require_relative 'spec_helper'
 
 describe Oxidized::Node do
   before(:each) do
     Oxidized.asetus = Asetus.new
+    Oxidized.asetus.cfg.debug = false
     Oxidized.setup_logger
 
     Oxidized::Node.any_instance.stubs(:resolve_repo)
     Oxidized::Node.any_instance.stubs(:resolve_output)
-    @node = Oxidized::Node.new(name: 'example.com',
-                               input: 'ssh',
-                               output: 'git',
-                               model: 'junos',
+    @node = Oxidized::Node.new(name:     'example.com',
+                               input:    'ssh',
+                               output:   'git',
+                               model:    'junos',
                                username: 'alma',
                                password: 'armud',
-                               prompt: 'test_prompt')
+                               prompt:   'test_prompt')
   end
 
   describe '#new' do
     it 'should resolve input' do
-      @node.input[0].to_s.split('::')[1].must_equal 'SSH'
+      _(@node.input[0].to_s.split('::')[1]).must_equal 'SSH'
     end
     it 'should resolve model' do
-      @node.model.class.must_equal JunOS
+      _(@node.model.class).must_equal JunOS
     end
     it 'should resolve username' do
-      @node.auth[:username].must_equal 'alma'
+      _(@node.auth[:username]).must_equal 'alma'
     end
     it 'should resolve password' do
-      @node.auth[:password].must_equal 'armud'
+      _(@node.auth[:password]).must_equal 'armud'
     end
     it 'should require prompt' do
-      @node.prompt.must_equal 'test_prompt'
+      _(@node.prompt).must_equal 'test_prompt'
     end
   end
 
@@ -39,7 +40,7 @@ describe Oxidized::Node do
       stub_oxidized_ssh
 
       status, = @node.run
-      status.must_equal :success
+      _(status).must_equal :success
     end
     it 'should record the success' do
       stub_oxidized_ssh
@@ -50,7 +51,7 @@ describe Oxidized::Node do
       @node.stats.add j
       after_successes = @node.stats.successes
       successes = after_successes - before_successes
-      successes.must_equal 1
+      _(successes).must_equal 1
     end
     it 'should record a failure' do
       stub_oxidized_ssh_fail
@@ -61,7 +62,7 @@ describe Oxidized::Node do
       @node.stats.add j
       after_fails = @node.stats.failures
       fails = after_fails - before_fails
-      fails.must_equal 1
+      _(fails).must_equal 1
     end
   end
 
@@ -80,7 +81,7 @@ describe Oxidized::Node do
 
     it 'when there are no groups' do
       Oxidized.config.output.git.repo = '/tmp/repository.git'
-      node.repo.must_equal '/tmp/repository.git'
+      _(node.repo).must_equal '/tmp/repository.git'
     end
 
     describe 'when there are groups' do
@@ -98,7 +99,7 @@ describe Oxidized::Node do
         end
 
         it 'should use the correct remote' do
-          node.repo.must_equal '/tmp/repository.git'
+          _(node.repo).must_equal '/tmp/repository.git'
         end
       end
 
@@ -110,8 +111,51 @@ describe Oxidized::Node do
         end
 
         it 'should use the correct remote' do
-          node.repo.must_equal '/tmp/ggrroouupp.git'
+          _(node.repo).must_equal '/tmp/ggrroouupp.git'
         end
+      end
+    end
+  end
+
+  describe '#resolve_key test hierarchy' do
+    let(:group) { 'test_group' }
+    let(:model) { 'junos' }
+    let(:node) do
+      Oxidized::Node.new(
+        ip: '127.0.0.1', group: group, model: model
+      )
+    end
+
+    describe 'create node with different usernames defined on each level' do
+      it 'should use global username if set' do
+        Oxidized.config.username = "global_username"
+        _(node.auth[:username]).must_equal "global_username"
+      end
+      it 'should prefer model username over global one' do
+        Oxidized.config.username = "global_username"
+        Oxidized.config.models[model].username = "model_username"
+        _(node.auth[:username]).must_equal "model_username"
+      end
+      it 'should prefer group username over model one' do
+        Oxidized.config.username = "global_username"
+        Oxidized.config.models[model].username = "model_username"
+        Oxidized.config.groups[group].username = "group_username"
+        _(node.auth[:username]).must_equal "group_username"
+      end
+      it 'should prefer model username group setting over normal group one' do
+        Oxidized.config.username = "global_username"
+        Oxidized.config.models[model].username = "model_username"
+        Oxidized.config.groups[group].username = "group_username"
+        Oxidized.config.groups[group].models[model].username = "group_model_username"
+        _(node.auth[:username]).must_equal "group_model_username"
+      end
+      it 'should prefer node username over everything else' do
+        Oxidized.config.username = "global_username"
+        Oxidized.config.models[model].username = "model_username"
+        Oxidized.config.groups[group].username = "group_username"
+        Oxidized.config.groups[group].models[model].username = "group_model_username"
+        node = Oxidized::Node.new(ip: '127.0.0.1', group: group, model: model, username: "node_username")
+        _(node.auth[:username]).must_equal "node_username"
       end
     end
   end

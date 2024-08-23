@@ -1,4 +1,6 @@
 class ScreenOS < Oxidized::Model
+  using Refinements
+
   # Netscreen ScreenOS model #
 
   comment '! '
@@ -6,7 +8,7 @@ class ScreenOS < Oxidized::Model
   prompt /^[\w.:()-]+->\s?$/
 
   cmd :all do |cfg|
-    cfg.each_line.to_a[2..-2].join
+    cfg.each_line.to_a[1..-2].join
   end
 
   cmd :secret do |cfg|
@@ -24,8 +26,7 @@ class ScreenOS < Oxidized::Model
   end
 
   cmd 'get config' do |cfg|
-    cfg = cfg.each_line.to_a[3..-1].join
-    cfg
+    cfg.each_line.to_a[1..-1].join
   end
 
   cfg :telnet do

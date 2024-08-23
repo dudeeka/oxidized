@@ -1,4 +1,6 @@
 class OneOS < Oxidized::Model
+  using Refinements
+
   prompt /^([\w.@()-]+#\s?)$/
   comment  '! '
 
@@ -27,6 +29,14 @@ class OneOS < Oxidized::Model
   end
 
   cmd 'show version' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show system hardware' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show product-info-area' do |cfg|
     comment cfg
   end
 

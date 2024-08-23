@@ -1,4 +1,6 @@
 class AOS7 < Oxidized::Model
+  using Refinements
+
   # Alcatel-Lucent Operating System Version 7 (Linux based)
   # used in OmniSwitch 6900/10k
 
@@ -17,7 +19,7 @@ class AOS7 < Oxidized::Model
   cmd 'show chassis' do |cfg|
     # check for virtual chassis existence
     @slave_vcids = cfg.scan(/Chassis ID (\d+) \(Slave\)/).flatten
-    @master_vcid = $1 if cfg.match /Chassis ID (\d+) \(Master\)/
+    @master_vcid = Regexp.last_match(1) if cfg =~ /Chassis ID (\d+) \(Master\)/
     comment cfg
   end
 
@@ -47,8 +49,8 @@ class AOS7 < Oxidized::Model
   end
 
   cfg :telnet do
-    username /^login : /
-    password /^Password : /
+    username /^([\w -])*login: /
+    password /^Password\s?: /
   end
 
   cfg :telnet, :ssh do

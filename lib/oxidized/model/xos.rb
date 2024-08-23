@@ -1,13 +1,22 @@
 class XOS < Oxidized::Model
+  using Refinements
+
   # Extreme Networks XOS
 
-  prompt /^*?[\w .-]+# $/
+  prompt /^\s?\*?\s?[-\w]+\s?[-\w.~]+(:\d+)? [#>] $/
   comment  '# '
 
   cmd :all do |cfg|
     # xos inserts leading \r characters and other trailing white space.
     # this deletes extraneous \r and trailing white space.
     cfg.each_line.to_a[1..-2].map { |line| line.delete("\r").rstrip }.join("\n") + "\n"
+  end
+
+  cmd :secret do |cfg|
+    cfg.gsub! /^(configure radius (netlogin|mgmt-access) (primary|secondary) shared-secret encrypted).+/, '\\1 <secret hidden>'
+    cfg.gsub! /^(configure account admin encrypted).+/, '\\1 <secret hidden>'
+    cfg.gsub! /^(create account (admin|user) (.+) encrypted).+/, '\\1 <secret hidden>'
+    cfg
   end
 
   cmd 'show version' do |cfg|
@@ -23,7 +32,8 @@ class XOS < Oxidized::Model
   end
 
   cmd 'show switch' do |cfg|
-    comment cfg.each_line.reject { |line| line.match /Time:/ or line.match /boot/i }.join
+    cfg.gsub! /Next periodic save on.*/, ''
+    comment cfg.each_line.reject { |line| line.match(/Time:/) || line.match(/boot/i) || line.match(/Next periodic/) }.join
   end
 
   cmd 'show configuration' do |cfg|
@@ -43,7 +53,7 @@ class XOS < Oxidized::Model
   cfg :telnet, :ssh do
     post_login do
       data = cmd 'disable clipaging session'
-      match = data.match /^disable clipaging session\n\*?[\w .-]+(:\d+)? # $/m
+      match = data.match /^disable clipaging session\n\r?\*?\s?[-\w]+\s?[-\w.~]+(:\d+)? [#>] $/m
       next if match
 
       cmd 'disable clipaging'

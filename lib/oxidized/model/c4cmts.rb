@@ -1,4 +1,6 @@
 class C4CMTS < Oxidized::Model
+  using Refinements
+
   # Arris C4 CMTS
 
   prompt /^([\w.@:\/-]+[#>]\s?)$/
@@ -16,8 +18,7 @@ class C4CMTS < Oxidized::Model
     cfg
   end
 
-  cmd 'show environment' do |cfg|
-    cfg.gsub! /\s+[\-\d]+\s+C\s+[(\s\d]+\s+F\)/, ''	# remove temperature readings
+  cmd 'show factory-eeprom' do |cfg|
     comment cfg.cut_both
   end
 

@@ -1,4 +1,4 @@
-require 'slack'
+require 'slack_ruby_client'
 
 # defaults to posting a diff, if messageformat is supplied them a message will be posted too
 # diff defaults to true
@@ -14,11 +14,11 @@ class SlackDiff < Oxidized::Hook
     return unless ctx.event.to_s == "post_store"
 
     log "Connecting to slack"
-    Slack.configure do |config|
+    Slack::Web::Client.configure do |config|
       config.token = cfg.token
       config.proxy = cfg.proxy if cfg.has_key?('proxy')
     end
-    client = Slack::Client.new
+    client = Slack::Web::Client.new
     client.auth_test
     log "Connected"
     if cfg.has_key?("diff") ? cfg.diff : true

@@ -1,4 +1,6 @@
 class Firebrick < Oxidized::Model
+  using Refinements
+
   # Firebrick #
   prompt /\x0a\x1b\x5b\x32\x4b\x0d.*>\s/
 
@@ -8,8 +10,8 @@ class Firebrick < Oxidized::Model
   end
 
   cmd 'show status' do |cfg|
-    cfg.gsub! /Status/, ''
-    cfg.gsub! /------/, ''
+    cfg.gsub! "Status", ''
+    cfg.gsub! "------", ''
     cfg.gsub! /Uptime.*/, ''
     cfg.gsub! /Current time.*/, ''
     cfg.gsub! /RAM.*/, ''

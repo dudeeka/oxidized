@@ -1,4 +1,6 @@
 class AOS < Oxidized::Model
+  using Refinements
+
   # Alcatel-Lucent Operating System
   # used in OmniSwitch
 
@@ -18,6 +20,14 @@ class AOS < Oxidized::Model
   end
 
   cmd 'show hardware info' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show license info' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show license file' do |cfg|
     comment cfg
   end
 

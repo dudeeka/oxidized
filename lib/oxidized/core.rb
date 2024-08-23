@@ -1,6 +1,6 @@
 module Oxidized
   class << self
-    def new *args
+    def new(*args)
       Core.new args
     end
   end
@@ -8,14 +8,22 @@ module Oxidized
   class Core
     class NoNodesFound < OxidizedError; end
 
-    def initialize args
+    def initialize(_args)
       Oxidized.mgr = Manager.new
-      Oxidized.Hooks = HookManager.from_config(Oxidized.config)
+      Oxidized.hooks = HookManager.from_config(Oxidized.config)
       nodes = Nodes.new
-      raise NoNodesFound, 'source returns no usable nodes' if nodes.size == 0
+      raise NoNodesFound, 'source returns no usable nodes' if nodes.empty?
 
       @worker = Worker.new nodes
-      trap('HUP') { nodes.load }
+      @need_reload = false
+
+      # If we receive a SIGHUP, queue a reload of the state
+      reload_proc = proc do
+        @need_reload = true
+      end
+      Signals.register_signal('HUP', reload_proc)
+
+      # Initialize REST API and webUI if requested
       if Oxidized.config.rest?
         begin
           require 'oxidized/web'
@@ -31,11 +39,19 @@ module Oxidized
 
     private
 
+    def reload
+      Oxidized.logger.info("Reloading node list and log files")
+      @worker.reload
+      Oxidized.logger.reopen
+      @need_reload = false
+    end
+
     def run
       Oxidized.logger.debug "lib/oxidized/core.rb: Starting the worker..."
-      while true
+      loop do
+        reload if @need_reload
         @worker.work
-        sleep Config::Sleep
+        sleep Config::SLEEP
       end
     end
   end

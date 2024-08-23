@@ -1,10 +1,14 @@
 class Netgear < Oxidized::Model
+  using Refinements
+
   comment '!'
-  prompt /^(\([\w\s\-.]+\)\s[#>])$/
+  prompt /^(\([\w\s\-\+.]+\)\s?[#>])$/
 
   cmd :secret do |cfg|
     cfg.gsub!(/password (\S+)/, 'password <hidden>')
     cfg.gsub!(/encrypted (\S+)/, 'encrypted <hidden>')
+    cfg.gsub!(/snmp-server community (\S+)$/, 'snmp-server community <hidden>')
+    cfg.gsub!(/snmp-server community (\S+) (\S+) (\S+)/, 'snmp-server community \\1 \\2 <hidden>')
     cfg
   end
 
@@ -28,10 +32,26 @@ class Netgear < Oxidized::Model
     #     The system has unsaved changes.
     #     Would you like to save them now? (y/n)
     #
-    # So it is safer simply to disconnect and not issue a pre_logout command
+    # As no changes will be made over this simple SSH session, we can safely choose "n" here.
+    pre_logout 'quit'
+    pre_logout 'n'
   end
 
+  cmd :all do |cfg, cmdstring|
+    new_cfg = comment "COMMAND: #{cmdstring}\n"
+    new_cfg << cfg.each_line.to_a[1..-2].join
+  end
+
+  cmd 'show version' do |cfg|
+    cfg.gsub! /(Current Time\.+ ).*/, '\\1 <removed>'
+    comment cfg
+  end
+
+  cmd 'show bootvar' do |cfg|
+    comment cfg
+  end
   cmd 'show running-config' do |cfg|
-    cfg.gsub! /^(!.*Time).*$/, '\1'
+    cfg.gsub! /(System Up Time\s+).*/, '\\1 <removed>'
+    cfg.gsub! /(Current SNTP Synchronized Time:).*/, '\\1 <removed>'
   end
 end

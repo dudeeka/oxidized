@@ -1,4 +1,6 @@
 class AOSW < Oxidized::Model
+  using Refinements
+
   # AOSW Aruba Wireless, IAP, Instant Controller and Mobility Access Switches
   # Used in Alcatel OAW-4750 WLAN controller
   # Also Dell controllers
@@ -9,8 +11,14 @@ class AOSW < Oxidized::Model
   # Support for Mobility Access Switches tested with S2500-48P & S2500-24P running 7.4.1.4_54199 and S2500-24P running 7.4.1.7_57823
   # All IAPs connected to a Instant Controller will have the same config output. Only the controller needs to be monitored.
 
-  comment  '# '
-  prompt /^\(?.+\)?\s[#>]/
+  comment '# '
+  # see /spec/model/aosw_spec.rb for prompt examples
+  prompt(/^\(?[\w\:.@-]+\)? ?[*^]?(\[[\w\/]+\] ?)?[#>] ?$/)
+
+  # Ignore cariage returns - also for the prompt
+  expect "\r" do |data, re|
+    data.gsub re, ''
+  end
 
   cmd :all do |cfg|
     cfg.cut_both
@@ -39,30 +47,35 @@ class AOSW < Oxidized::Model
   end
 
   cmd 'show version' do |cfg|
-    cfg = cfg.each_line.reject { |line| line.match /(Switch|AP) uptime/i }
+    cfg = cfg.each_line.reject { |line| line.match(/(Switch|AP) uptime/i) || line.match(/Reboot Time and Cause/i) }
     rstrip_cfg comment cfg.join
   end
 
   cmd 'show inventory' do |cfg|
-    cfg = "" if cfg.match /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
+    cfg = "" if cfg =~ /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
     rstrip_cfg clean cfg
   end
 
   cmd 'show slots' do |cfg|
-    cfg = "" if cfg.match /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
+    cfg = "" if cfg =~ /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
     rstrip_cfg comment cfg
   end
 
   cmd 'show license' do |cfg|
-    cfg = "" if cfg.match /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
+    cfg = "" if cfg =~ /(Invalid input detected at '\^' marker|Parse error)/ # Don't show for unsupported devices (IAP and MAS)
+    rstrip_cfg comment cfg
+  end
+
+  cmd 'show license passphrase' do |cfg|
+    cfg = "" if cfg.match(/(Invalid input detected at '\^' marker|Parse error)/) # Don't show for unsupported devices (IAP and MAS)
     rstrip_cfg comment cfg
   end
 
   cmd 'show running-config' do |cfg|
     out = []
     cfg.each_line do |line|
-      next if line.match /^controller config \d+$/
-      next if line.match /^Building Configuration/
+      next if line =~ /^controller config \d+$/
+      next if line =~ /^Building Configuration/
 
       out << line.strip
     end
@@ -71,8 +84,8 @@ class AOSW < Oxidized::Model
   end
 
   cfg :telnet do
-    username /^User:\s*/
-    password /^Password:\s*/
+    username(/^User:\s*/)
+    password(/^Password:\s*/)
   end
 
   cfg :telnet, :ssh do
@@ -84,13 +97,11 @@ class AOSW < Oxidized::Model
     end
     post_login 'no paging'
     post_login 'encrypt disable'
-    if vars :enable
-      pre_logout 'exit'
-    end
+    pre_logout 'exit' if vars :enable
     pre_logout 'exit'
   end
 
-  def rstrip_cfg cfg
+  def rstrip_cfg(cfg)
     out = []
     cfg.each_line do |line|
       out << line.rstrip
@@ -99,14 +110,14 @@ class AOSW < Oxidized::Model
     out << "\n"
   end
 
-  def clean cfg
+  def clean(cfg)
     out = []
     cfg.each_line do |line|
       # drop the temperature, fan speed and voltage, which change each run
-      next if line.match /Output \d Config/i
-      next if line.match /(Tachometers|Temperatures|Voltages)/
-      next if line.match /((Card|CPU) Temperature|Chassis Fan|VMON1[0-9])/
-      next if line.match /[0-9]+\s+(RPMS?|m?V|C)/i
+      next if line =~ /Output \d Config/i
+      next if line =~ /(Tachometers|Temperatures|Voltages)/
+      next if line =~ /((Card|CPU) Temperature|Chassis Fan|VMON1[0-9])/
+      next if line =~ /[0-9]+\s+(RPMS?|m?V|C)/i
 
       out << line.strip
     end

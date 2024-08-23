@@ -1,18 +1,40 @@
 inherit_from: .rubocop_todo.yml
 
+# Do not attempt to police vendored code
 AllCops:
-  Include:
-    - Rakefile
+  NewCops: enable
+  TargetRubyVersion: 3.1
+  Exclude:
+    - 'vendor/**/*'
 
-StringLiterals:
+Gemspec/DevelopmentDependencies:
+  EnforcedStyle: gemspec
+
+Style/StringLiterals:
   Enabled: false
 
-LineLength:
+Style/FrozenStringLiteralComment:
   Enabled: false
+
+Layout/LineLength:
+  Enabled: false
+
+Lint/AmbiguousRegexpLiteral:
+  Enabled: false
+
+Lint/RaiseException:
+  Enabled: true
+
+Lint/StructNewOverride:
+  Enabled: true
 
 # Stick to verbose until https://bugs.ruby-lang.org/issues/10177 is closed.
 Style/PreferredHashMethods:
   EnforcedStyle: verbose
+
+Layout/HashAlignment:
+  EnforcedHashRocketStyle: table
+  EnforcedColonStyle: table
 
 Style/Not:
   Enabled: false
@@ -27,17 +49,51 @@ Style/FormatString:
 Style/FormatStringToken:
   EnforcedStyle: unannotated
 
-Style/RescueModifier:
-  Enabled: false
+Style/HashEachMethods:
+  Enabled: true
 
-Style/MultilineBlockChain:
+Style/HashSyntax:
+  EnforcedShorthandSyntax: either
+
+Style/HashTransformKeys:
+  Enabled: true
+
+Style/HashTransformValues:
+  Enabled: true
+
+Style/RescueModifier:
   Enabled: false
 
 Style/SymbolProc:
   Enabled: false
 
-# Do not attempt to police vendored code, and exclude special cases
-AllCops:
-  Exclude:
-    - 'vendor/**/*'
-    - 'lib/oxidized/input/tftp.rb'
+Style/Documentation:
+  Enabled: false
+
+Style/ParallelAssignment:
+  Enabled: false
+
+Metrics/MethodLength:
+  Max: 50
+
+Metrics/AbcSize:
+  Max: 28
+
+Metrics/ClassLength:
+  Max: 200
+
+## Metrics/CyclomaticComplexity:
+##   Max: 7
+
+Metrics/BlockLength:
+  Max: 150
+
+Metrics/ParameterLists:
+  Max: 6
+
+Lint/EmptyBlock:
+  Enabled: false
+
+require:
+  - rubocop-rake
+  - rubocop-minitest

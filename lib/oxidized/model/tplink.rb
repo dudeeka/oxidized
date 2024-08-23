@@ -1,4 +1,6 @@
 class TPLink < Oxidized::Model
+  using Refinements
+
   # tp-link prompt
   prompt /^\r?([\w.@()-]+[#>]\s?)$/
   comment '! '
@@ -35,6 +37,8 @@ class TPLink < Oxidized::Model
   end
 
   cmd 'show system-info' do |cfg|
+    cfg.gsub! /(System Time\s+-).*/, '\\1 <stripped>'
+    cfg.gsub! /(Running Time\s+-).*/, '\\1 <stripped>'
     comment cfg.each_line.to_a[3..-3].join
   end
 
@@ -50,9 +54,10 @@ class TPLink < Oxidized::Model
   end
 
   cfg :telnet, :ssh do
-    if vars :enable
-      post_login do
-        send "enable\r"
+    post_login do
+      if vars(:enable) == true
+        cmd "enable"
+      elsif vars(:enable)
         cmd vars(:enable)
       end
     end

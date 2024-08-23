@@ -1,4 +1,6 @@
 class Casa < Oxidized::Model
+  using Refinements
+
   # Casa Systems CMTS
 
   prompt /^([\w.@()-]+[#>]\s?)$/
@@ -10,6 +12,7 @@ class Casa < Oxidized::Model
     cfg.gsub! /^(console-password encrypted) \S+/, '\\1 <secret hidden>'
     cfg.gsub! /^(password encrypted) \S+/, '\\1 <secret hidden>'
     cfg.gsub! /^(tacacs-server key) \S+/, '\\1 <secret hidden>'
+    cfg.gsub! /^(  ip rip authentication secret) \S+/, '\\1 <secret hidden>'
     cfg
   end
 
@@ -18,7 +21,9 @@ class Casa < Oxidized::Model
   end
 
   cmd 'show system' do |cfg|
-    comment cfg.each_line.reject { |line| line.match /^\s+System (Time|Uptime): / }.join
+    cfg.gsub! /Uptime:.*/, 'Uptime: <removed>'
+    cfg.gsub! /Time:.*/, 'Time: <removed>'
+    comment cfg
   end
 
   cmd 'show version' do |cfg|

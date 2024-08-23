@@ -1,4 +1,6 @@
 class HPEBladeSystem < Oxidized::Model
+  using Refinements
+
   # HPE Onboard Administrator
 
   prompt /.*> /
@@ -69,7 +71,7 @@ class HPEBladeSystem < Oxidized::Model
   end
 
   cmd 'show config' do |cfg|
-    cfg.gsub! /^#(Generated on:) .*$/, '\\1 <removed>'
+    cfg.gsub! /^(#Generated on:) .*$/, '\\1 <removed>'
     cfg.gsub /^\s+/, ''
   end
 

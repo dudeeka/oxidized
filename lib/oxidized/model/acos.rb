@@ -1,7 +1,9 @@
 class ACOS < Oxidized::Model
+  using Refinements
+
   # A10 ACOS model for AX and Thunder series
 
-  comment  '! '
+  comment '! '
 
   # ACOS prompt changes depending on the state of the device
   prompt /^([-\w.\/:?\[\]()]+[#>]\s?)$/
@@ -51,9 +53,9 @@ class ACOS < Oxidized::Model
 
   cmd 'show aflex all-partitions' do |cfg|
     @partitions_aflex = cfg.lines.each_with_object({}) do |l, h|
-      h[$1] = [] if l.match /partition: (.+)/
+      h[Regexp.last_match(1)] = [] if l =~ /partition: (.+)/
       # only consider scripts that have passed syntax check
-      h[h.keys.last] << $1 if l.match /^([\w-]+) +Check/
+      h[h.keys.last] << Regexp.last_match(1) if l =~ /^([\w-]+) +Check/
     end
     ''
   end
@@ -70,7 +72,7 @@ class ACOS < Oxidized::Model
         out << "! partition: #{partition}"
         arules.each do |name|
           cmd("show aflex #{name} partition #{partition}") do |cfg|
-            content = cfg.split(/Content:/).last.strip
+            content = cfg.split("Content:").last.strip
             out << "aflex create #{name}"
             out << content
             out << ".\n"

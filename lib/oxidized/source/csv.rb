@@ -7,7 +7,7 @@ module Oxidized
 
     def setup
       if @cfg.empty?
-        Oxidized.asetus.user.source.csv.file      = File.join(Config::Root, 'router.db')
+        Oxidized.asetus.user.source.csv.file      = File.join(Config::ROOT, 'router.db')
         Oxidized.asetus.user.source.csv.delimiter = /:/
         Oxidized.asetus.user.source.csv.map.name  = 0
         Oxidized.asetus.user.source.csv.map.model = 1
@@ -18,10 +18,10 @@ module Oxidized
       require 'gpgme' if @cfg.gpg?
     end
 
-    def load _node_want = nil
+    def load(_node_want = nil)
       nodes = []
       open_file.each_line do |line|
-        next if line.match(/^\s*#/)
+        next if line =~ /^\s*#/
 
         data = line.chomp.split(@cfg.delimiter, -1)
         next if data.empty?
@@ -32,6 +32,7 @@ module Oxidized
           keys[key.to_sym] = node_var_interpolate data[position]
         end
         keys[:model] = map_model keys[:model] if keys.has_key? :model
+        keys[:group] = map_group keys[:group] if keys.has_key? :group
 
         # map node specific vars
         vars = {}
@@ -43,18 +44,6 @@ module Oxidized
         nodes << keys
       end
       nodes
-    end
-
-    private
-
-    def open_file
-      file = File.expand_path(@cfg.file)
-      if @cfg.gpg?
-        crypto = GPGME::Crypto.new password: @cfg.gpg_password
-        crypto.decrypt(File.open(file)).to_s
-      else
-        open(file)
-      end
     end
   end
 end

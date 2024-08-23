@@ -1,4 +1,6 @@
 class VOLTAIRE < Oxidized::Model
+  using Refinements
+
   prompt /([\w.@()-\[:\s\]]+[#>]\s|(One or more tests have failed.*))$/
   comment '## '
 
@@ -16,7 +18,7 @@ class VOLTAIRE < Oxidized::Model
     cfg.gsub! /^System memory:\s.+/, '' # Omit constantly changing memory info
     cfg.gsub! /^Uptime:\s.+/, '' # Omit constantly changing uptime info
     cfg.gsub! /.+Generated at\s\d+.+/, '' # Omit constantly changing generation time info
-    cfg = cfg.lines.to_a[2..-3].join
+    cfg.lines.to_a[2..-3].join
   end
 
   cmd :secret do |cfg|

@@ -1,5 +1,7 @@
 class TMOS < Oxidized::Model
-  comment  '# '
+  using Refinements
+
+  comment '# '
 
   cmd :secret do |cfg|
     cfg.gsub!(/^([\s\t]*)secret \S+/, '\1secret <secret removed>')
@@ -18,6 +20,7 @@ class TMOS < Oxidized::Model
   cmd 'tmsh -q show sys hardware field-fmt' do |cfg|
     cfg.gsub!(/fan-speed (\S+)/, '')
     cfg.gsub!(/temperature (\S+)/, '')
+    cfg.gsub!(/humidity (\S+)/, '')
     comment cfg
   end
 
@@ -26,6 +29,9 @@ class TMOS < Oxidized::Model
   cmd 'tmsh -q list' do |cfg|
     cfg.gsub!(/state (up|down|checking|irule-down)/, '')
     cfg.gsub!(/errors (\d+)/, '')
+    cfg.gsub!(/^\s+bandwidth-bps (\d+)/, '')
+    cfg.gsub!(/^\s+bandwidth-cps (\d+)/, '')
+    cfg.gsub!(/^\s+bandwidth-pps (\d+)\n/, '')
     cfg
   end
 
@@ -44,7 +50,7 @@ class TMOS < Oxidized::Model
 
   cmd('[ -d "/config/zebos" ] && cat /config/zebos/*/ZebOS.conf') { |cfg| comment cfg }
 
-  cmd('cat /config/partitions/*/bigip.conf') { |cfg| comment cfg }
+  cmd('cat /config/partitions/*/bigip*.conf') { |cfg| comment cfg }
 
   cfg :ssh do
     exec true # don't run shell, run each command in exec channel

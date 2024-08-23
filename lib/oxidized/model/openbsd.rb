@@ -1,17 +1,19 @@
 class Openbsd < Oxidized::Model
+  using Refinements
+
   # OpenBSD with custom promp, like user@hostname:~$
   # you can edit the one that your user uses, with root would be /root/.profile using the next PS1 def
   # export PS1="\033[32m\u@\h\033[00m:\033[36m\w\033[00m$ "
 
-  prompt /^.+@.+\:.+\$/
+  prompt /^.+@.+:.+\$/
   comment '# '
 
   # Add a comment between files/configs
-  def add_comment comment
+  def add_comment(comment)
     "\n+++++++++++++++++++++++++++++++++++++++++ #{comment} ++++++++++++++++++++++++++++++++++++++++++++++\n"
   end
 
-  def add_small_comment comment
+  def add_small_comment(comment)
     "\n=============== #{comment} ===============\n"
   end
 
@@ -48,7 +50,17 @@ class Openbsd < Oxidized::Model
     cfg += add_comment('PASSWD FILE')
     cfg += cmd('cat /etc/passwd')
 
+    cfg += add_comment('BGPD FILE')
+    cfg += cmd('cat /etc/bgpd.conf')
+
+    cfg += add_comment('OSPFD FILE')
+    cfg += cmd('cat /etc/ospfd.conf')
+
+    cfg += add_comment('OSPF6D FILE')
+    cfg += cmd('cat /etc/ospf6d.conf')
+
     cfg += add_small_comment('END')
+    cfg
   end
 
   cfg :telnet do

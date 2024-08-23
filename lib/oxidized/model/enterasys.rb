@@ -1,15 +1,27 @@
 class Enterasys < Oxidized::Model
+  using Refinements
+
   # Enterasys B3/C3 models #
 
-  prompt /^.+\w\(su\)->\s?$/
+  prompt /^.+\w\((su|rw)\)->\s?$/
 
-  comment  '!'
+  comment '!'
+
+  # Handle paging
+  expect /^--More--.*$/ do |data, re|
+    send ' '
+    data.sub re, ''
+  end
 
   cmd :all do |cfg|
     cfg.each_line.to_a[2..-3].map { |line| line.delete("\r").rstrip }.join("\n") + "\n"
   end
 
   cmd 'show system hardware' do |cfg|
+    comment cfg
+  end
+
+  cmd 'show version' do |cfg|
     comment cfg
   end
 
@@ -22,7 +34,12 @@ class Enterasys < Oxidized::Model
     cfg
   end
 
-  cfg :ssh do
+  cfg :telnet do
+    username /^Username:/i
+    password /^Password:/i
+  end
+
+  cfg :telnet, :ssh do
     pre_logout 'exit'
   end
 end

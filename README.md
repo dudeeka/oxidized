@@ -1,5 +1,6 @@
 # Oxidized
-[![Build Status](https://api.travis-ci.com/ytti/oxidized.svg)](https://travis-ci.com/ytti/oxidized)
+
+[![Build Status](https://github.com/ytti/oxidized/actions/workflows/ruby.yml/badge.svg)](https://github.com/ytti/oxidized/actions/workflows/ruby.yml)
 [![codecov.io](https://codecov.io/gh/ytti/oxidized/coverage.svg?branch=master)](https://codecov.io/gh/ytti/oxidized?branch=master)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/5a90cb22db6a4d5ea23ad0dfb53fe03a)](https://www.codacy.com/app/ytti/oxidized?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=ytti/oxidized&amp;utm_campaign=Badge_Grade)
 [![Code Climate](https://codeclimate.com/github/ytti/oxidized/badges/gpa.svg)](https://codeclimate.com/github/ytti/oxidized)
@@ -8,7 +9,7 @@
 
 Oxidized is a network device configuration backup tool. It's a RANCID replacement!
 
-Light and extensible, Oxidized supports over 90 operating system types.
+It is light and extensible and supports over 130 operating system types.
 
 Feature highlights:
 
@@ -16,13 +17,13 @@ Feature highlights:
 * Restful API to a move node immediately to head-of-queue (GET/POST /node/next/[NODE])
 * Syslog udp+file example to catch config change events (IOS/JunOS) and trigger a config fetch
   * Will signal which IOS/JunOS user made the change, can then be used by output modules (via POST)
-  * The `git` output module uses this info - 'git blame' will show who changed each line, and when
+  * The `git` output module uses this info - 'git blame' will show who changed each line
 * Restful API to reload list of nodes (GET /reload)
 * Restful API to fetch configurations (/node/fetch/[NODE] or /node/fetch/group/[NODE])
 * Restful API to show list of nodes (GET /nodes)
 * Restful API to show list of version for a node (/node/version[NODE]) and diffs
 
-Check out the [Oxidized TREX 2014 presentation](http://youtu.be/kBQ_CTUuqeU#t=3h) video on YouTube!
+Check out the [Oxidized TREX 2014 presentation](http://youtu.be/kBQ_CTUuqeU?t=3h) video on YouTube!
 
 > :warning: [Maintainer Wanted!](#help-needed) :warning:
 >
@@ -37,7 +38,8 @@ Check out the [Oxidized TREX 2014 presentation](http://youtu.be/kBQ_CTUuqeU#t=3h
     * [FreeBSD](#freebsd)
     * [Build from Git](#build-from-git)
     * [Docker](#running-with-docker)
-    * [Installing Ruby 2.1.2 using RVM](#installing-ruby-212-using-rvm)
+    * [Podman-Compose](#running-with-podman-compose)
+    * [Installing Ruby 2.3 using RVM](#installing-ruby-23-using-rvm)
 3. [Initial Configuration](#configuration)
 4. [Configuration](docs/Configuration.md)
     * [Debugging](docs/Configuration.md#debugging)
@@ -66,7 +68,8 @@ Check out the [Oxidized TREX 2014 presentation](http://youtu.be/kBQ_CTUuqeU#t=3h
       * [Hook: ciscosparkdiff](docs/Hooks.md#hook-type-ciscosparkdiff)
 5. [Creating and Extending Models](docs/Creating-Models.md)
 6. [Help](#help)
-7. [Ruby API](docs/Ruby-API.md#ruby-api)
+7. [Help Needed](#help-needed)
+8. [Ruby API](docs/Ruby-API.md#ruby-api)
     * [Input](docs/Ruby-API.md#input)
     * [Output](docs/Ruby-API.md#output)
     * [Source](docs/Ruby-API.md#source)
@@ -76,7 +79,7 @@ Check out the [Oxidized TREX 2014 presentation](http://youtu.be/kBQ_CTUuqeU#t=3h
 
 ### Debian and Ubuntu
 
-Debian "buster" or newer and Ubuntu 17.10 (artful) or newer are recommended. On Ubuntu, begin by enabling the `universe` 
+Debian "buster" or newer and Ubuntu 17.10 (artful) or newer are recommended. On Ubuntu, begin by enabling the `universe`
 repository (required for libssh2-1-dev):
 
 ```shell
@@ -86,7 +89,7 @@ add-apt-repository universe
 Install the dependencies:
 
 ```shell
-apt-get install ruby ruby-dev libsqlite3-dev libssl-dev pkg-config cmake libssh2-1-dev libicu-dev zlib1g-dev
+apt-get install ruby ruby-dev libsqlite3-dev libssl-dev pkg-config cmake libssh2-1-dev libicu-dev zlib1g-dev g++ libyaml-dev
 ```
 
 Finally, install the gems:
@@ -98,30 +101,38 @@ gem install oxidized-script oxidized-web # If you don't install oxidized-web, en
 
 ### CentOS, Oracle Linux, Red Hat Linux
 
-On CentOS 6 / RHEL 6, begin by installing Ruby 2.0 or greater. For Ruby 2.1.2 installation instructions see [Installing Ruby 2.1.2 using RVM](#installing-ruby-212-using-rvm).
+On CentOS 6 and 7 / RHEL 6 and 7, begin by installing Ruby 3.1 via RVM by following the instructions:
 
-If you've installed Ruby 2.0 or greater via a 3rd party package rather than the RVM instructions, additional dependencies will be required:
+Make sure you dont have any leftover ruby:
+```yum erase ruby```
 
-```shell
-yum install make cmake which sqlite-devel openssl-devel libssh2-devel ruby gcc ruby-devel libicu-devel gcc-c++
-```
-
-RHEL 7 / CentOS 7 will work out of the box with the following package list:
+Then, install gpg key and rvm
 
 ```shell
-yum install make cmake which sqlite-devel openssl-devel libssh2-devel ruby gcc ruby-devel libicu-devel gcc-c++
+sudo gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB
+curl -sSL https://get.rvm.io | bash -s stable
+source /etc/profile.d/rvm.sh
+rvm requirements run
+rvm install 3.1
+rvm use 3.1
 ```
 
-Now let's install oxidized via Rubygems:
+Install oxidized requirements:
+```yum install make cmake which sqlite-devel openssl-devel libssh2-devel gcc libicu-devel gcc-c++```
 
-```shell
-gem install oxidized
-gem install oxidized-script oxidized-web # if you don't install oxidized-web, make sure you remove "rest" from your config
-```
+Install the gems:
+```gem install oxidized oxidized-web```
+
+You need to wrap the gem and reference the wrap in the systemctl service file:
+```rvm wrapper oxidized```
+
+You can see where the wrapped gem is via
+```rvm wrapper show oxidized```
+Use that path in the oxidized.service file, restart the systemctl daemon, run oxidized by hand once, edit config file, start service.
 
 ### FreeBSD
 
-[Use RVM to install Ruby v2.1.2](#installing-ruby-212-using-rvm), then install all required packages and gems:
+[Use RVM to install Ruby v2.3](#installing-ruby-23-using-rvm), then install all required packages and gems:
 
 ```shell
 pkg install cmake pkgconf
@@ -146,7 +157,7 @@ rake install
 
 ### Running with Docker
 
-Currently, Docker Hub automatically builds the master branch as [oxidized/oxidized](https://hub.docker.com/r/oxidized/oxidized/), you can make use of this container or build your own.
+Currently, Docker Hub automatically builds the master branch for linux/amd64 and linux/arm64 platforms as [oxidized/oxidized](https://hub.docker.com/r/oxidized/oxidized/), you can make use of this container or build your own.
 
 To build your own, clone git repo:
 
@@ -173,7 +184,7 @@ Run the container for the first time to initialize the config:
 _Note: this step in only required for creating the Oxidized configuration file and can be skipped if you already have one._
 
 ```shell
-docker run --rm -v /etc/oxidized:/root/.config/oxidized -p 8888:8888/tcp -t oxidized/oxidized:latest oxidized
+docker run --rm -v /etc/oxidized:/home/oxidized/.config/oxidized -p 8888:8888/tcp --user oxidized -t oxidized/oxidized:latest oxidized
 ```
 
 If the RESTful API and Web Interface are enabled, on the docker host running the container
@@ -184,15 +195,20 @@ Alternatively, you can use docker-compose to launch the oxidized container:
 ```yaml
 # docker-compose.yml
 # docker-compose file example for oxidized that will start along with docker daemon
-oxidized:
-  restart: always
-  image: oxidized/oxidized:latest
-  ports:
-    - 8888:8888/tcp
-  environment:
-    CONFIG_RELOAD_INTERVAL: 600
-  volumes:
-    - /etc/oxidized:/root/.config/oxidized
+---
+version: "3"
+services:
+  oxidized:
+    restart: always
+    image: oxidized/oxidized:latest
+    ports:
+      - 8888:8888/tcp
+    environment:
+      CONFIG_RELOAD_INTERVAL: 600
+    volumes:
+       - config:/home/oxidized/.config/oxidized/
+volumes:
+  config:
 ```
 
 Create the `/etc/oxidized/router.db` (see [CSV Source](docs/Sources.md#source-csv) for further info):
@@ -204,7 +220,7 @@ vim /etc/oxidized/router.db
 Run container again to start oxidized with your configuration:
 
 ```shell
-docker run -v /etc/oxidized:/root/.config/oxidized -p 8888:8888/tcp -t oxidized/oxidized:latest
+docker run -v /etc/oxidized:/home/oxidized/.config/oxidized -p 8888:8888/tcp -t oxidized/oxidized:latest
 oxidized[1]: Oxidized starting, running as pid 1
 oxidized[1]: Loaded 1 nodes
 Puma 2.13.4 starting...
@@ -216,18 +232,22 @@ Puma 2.13.4 starting...
 If you want to have the config automatically reloaded (e.g. when using a http source that changes):
 
 ```shell
-docker run -v /etc/oxidized:/root/.config/oxidized -p 8888:8888/tcp -e CONFIG_RELOAD_INTERVAL=3600 -t oxidized/oxidized:latest
+docker run -v /etc/oxidized:/home/oxidized/.config/oxidized -p 8888:8888/tcp -e CONFIG_RELOAD_INTERVAL=3600 -t oxidized/oxidized:latest
 ```
 
 If you need to use an internal CA (e.g. to connect to an private github instance):
 
 ```shell
-docker run -v /etc/oxidized:/root/.config/oxidized -v /path/to/MY-CA.crt:/usr/local/share/ca-certificates/MY-CA.crt -p 8888:8888/tcp -e UPDATE_CA_CERTIFICATES=true -t oxidized/oxidized:latest
+docker run -v /etc/oxidized:/home/oxidized/.config/oxidized -v /path/to/MY-CA.crt:/usr/local/share/ca-certificates/MY-CA.crt -p 8888:8888/tcp -e UPDATE_CA_CERTIFICATES=true -t oxidized/oxidized:latest
 ```
 
-### Installing Ruby 2.1.2 using RVM
+### Running with podman-compose
+Under [examples/podman-compose](examples/podman-compose), you will find a complete
+example of how to integrate the container into a docker-compose.yml file.
 
-Install Ruby 2.1.2 build dependencies
+### Installing Ruby 2.3 using RVM
+
+Install Ruby 2.3 build dependencies
 
 ```shell
 yum install curl gcc-c++ patch readline readline-devel zlib zlib-devel
@@ -241,12 +261,12 @@ Install RVM
 curl -L get.rvm.io | bash -s stable
 ```
 
-Setup RVM environment and compile and install Ruby 2.1.2 and set it as default
+Setup RVM environment and compile and install Ruby 2.3 and set it as default
 
 ```shell
 source /etc/profile.d/rvm.sh
-rvm install 2.1.2
-rvm use --default 2.1.2
+rvm install 2.3
+rvm use --default 2.3
 ```
 
 ## Configuration
@@ -256,7 +276,7 @@ Oxidized configuration is in YAML format. Configuration files are subsequently s
 It is recommended practice to run Oxidized using its own username.  This username can be added using standard command-line tools:
 
 ```shell
-useradd oxidized
+useradd -s /bin/bash -m oxidized
 ```
 
 > It is recommended __not__ to run Oxidized as root.
@@ -286,7 +306,7 @@ Oxidized supports [CSV](docs/Configuration.md#source-csv),  [SQLite](docs/Config
 
 Possible outputs are either [File](docs/Configuration.md#output-file), [GIT](docs/Configuration.md#output-git), [GIT-Crypt](docs/Configuration.md#output-git-crypt) and [HTTP](docs/Configuration.md#output-http). The file backend takes a destination directory as argument and will keep a file per device, with most recent running version of a device. The GIT backend (recommended) will initialize an empty GIT repository in the specified path and create a new commit on every configuration change. The GIT-Crypt backend will also initialize a GIT repository but every configuration push to it will be encrypted on the fly by using `git-crypt` tool. Take a look at the [Configuration](docs/Configuration.md) for more details.
 
-Maps define how to map a model's fields to model [model fields](https://github.com/ytti/oxidized/tree/master/lib/oxidized/model). Most of the settings should be self explanatory, log is ignored if `use_syslog`(requires Ruby >= 2.0) is set to `true`.
+Maps define how to map a model's fields to model [model fields](https://github.com/ytti/oxidized/tree/master/lib/oxidized/model). Most of the settings should be self explanatory, log is ignored if `use_syslog` is set to `true`.
 
 First create the directory where the CSV `output` is going to store device configs and start Oxidized once.
 
@@ -320,9 +340,9 @@ Run `oxidized` again to take the first backups.
 
 ## Extra
 
-### Ubuntu SystemV init setup
+### Ubuntu init setup
 
-The init script assumes that you have a user named 'oxidized' and that oxidized is in one of the following paths:
+The systemd service assumes that you have a user named 'oxidized' and that oxidized is in one of the following paths:
 
 ```text
 /sbin
@@ -332,18 +352,23 @@ The init script assumes that you have a user named 'oxidized' and that oxidized 
 /usr/local/bin
 ```
 
-1. Copy init script from extra/ folder to /etc/init.d/oxidized
-2. Setup /var/run/
+1. Copy systemd service file from extra/ folder to /etc/systemd/system
 
 ```shell
-mkdir /var/run/oxidized
-chown oxidized:oxidized /var/run/oxidized
+sudo cp extra/oxidized.service /etc/systemd/system
+```
+
+2. Setup `/var/run/`
+
+```shell
+mkdir /run/oxidized
+chown oxidized:oxidized /run/oxidized
 ```
 
 3. Make oxidized start on boot
 
 ```shell
-update-rc.d oxidized defaults
+sudo systemctl enable oxidized.service
 ```
 
 ## Help
@@ -356,38 +381,14 @@ If you need help with Oxidized then we have a few methods you can use to get in 
 
 ## Help Needed
 
-As things stand right now, `oxidized` is maintained by a single person. A great
-many [contributors](https://github.com/ytti/oxidized/graphs/contributors) have
-helped further the software, however contributions are not the same as ongoing
-owner- and maintainer-ship. It appears that many companies use the software to
-manage their network infrastructure, this is great news! But without additional
-help to maintain the software and put out releases, the future of oxidized
-might be less bright. The current pace of development and the much needed
-refactoring simply are not sustainable if they are to be driven by a single
-person.
+As things stand right now, `oxidized` is maintained by very few people.
+We would appreciate more individuals and companies getting involved in Oxidized.
 
-## Maintainers
+Beyond software development, documentation or maintenance of Oxidized, you could
+become a model maintainer, which can be done with little burden and would be a
+big help to the community.
 
-If you would like to be a maintainer for Oxidized then please read through the below and see if it's something you would like to help with. It's not a requirement that you can tick all the boxes below but it helps :)
-
-* Triage on issues, review pull requests and help answer any questions from users.
-* Above average knowledge of the Ruby programming language.
-* Professional experience with both oxidized and some other config backup tool (like rancid).
-* Ability to keep a cool head, and enjoy interaction with end users! :)
-* A desire and passion to help drive `oxidized` towards its `1.x.x` stage of life
-  * Help refactor the code
-  * Rework the core infrastructure
-* Permission from your employer to contribute to open source projects
-
-## YES, I WANT TO HELP
-
-Awesome! Simply send an email to Saku Ytti <saku@ytti.fi>.
-
-## Further reading
-
-Brian Anderson (from Rust fame) wrote an [excellent
-post](http://brson.github.io/2017/04/05/minimally-nice-maintainer) on what it
-means to be a maintainer.
+Interested? Have a look at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and Copyright
 

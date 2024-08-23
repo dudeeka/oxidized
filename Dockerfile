@@ -1,16 +1,64 @@
-# Single-stage build of an oxidized container from phusion/baseimage-docker v0.11, derived from Ubuntu 18.04 (Bionic Beaver)
-FROM phusion/baseimage:0.11
-LABEL maintainer="Samer Abdel-Hafez <sam@arahant.net>"
+# Single-stage build of an oxidized container from phusion/baseimage-docker
+FROM docker.io/phusion/baseimage:noble-1.0.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+##### Place "static" commands at the beginning to optimize image size and build speed
+# add non-privileged user
+ARG UID=30000
+ARG GID=$UID
+RUN groupadd -g "${GID}" -r oxidized && useradd -u "${UID}" -r -m -d /home/oxidized -g oxidized oxidized
+
+# link config for msmtp for easier use.
+RUN ln -s /home/oxidized/.config/oxidized/.msmtprc /home/oxidized/
+
+# create parent directory & touch required file
+RUN mkdir -p /home/oxidized/.config/oxidized/
+RUN touch /home/oxidized/.config/oxidized/.msmtprc
+
+# setup the access to the file
+RUN chmod 600 /home/oxidized/.msmtprc
+RUN chown oxidized:oxidized /home/oxidized/.msmtprc
+
+# add runit services
+COPY extra/oxidized.runit /etc/service/oxidized/run
+COPY extra/auto-reload-config.runit /etc/service/auto-reload-config/run
+COPY extra/update-ca-certificates.runit /etc/service/update-ca-certificates/run
 
 # set up dependencies for the build process
-RUN apt-get -yq update && \
-    apt-get -yq install ruby2.5 ruby2.5-dev libssl1.1 libssl-dev pkg-config make cmake libssh2-1 libssh2-1-dev git g++ libffi-dev ruby-bundler libicu60 libicu-dev libsqlite3-0 libsqlite3-dev libmysqlclient20 libmysqlclient-dev
+RUN apt-get -yq update \
+    && apt-get -yq upgrade \
+    && apt-get -yq --no-install-recommends install ruby \
+    # Build process of oxidized from git (beloww)
+    git \
+    # Allow git send-email from docker image
+    git-email libmailtools-perl \
+    # Allow sending emails in the docker container
+    msmtp \
+    # Debuging tools inside the container
+    inetutils-telnet \
+    # Use ubuntu gems where possible
+    # Gems needed by oxidized
+    ruby-rugged ruby-slop ruby-psych \
+    ruby-net-telnet ruby-net-ssh ruby-net-ftp ruby-net-scp ruby-ed25519 \
+    # Gem dependencies for inputs
+    ruby-net-http-persistent ruby-mechanize \
+    # Gem dependencies for sources
+    ruby-sqlite3 ruby-mysql2 ruby-pg ruby-sequel ruby-gpgme\
+    # Gem dependencies for hooks
+    ruby-aws-sdk ruby-xmpp4r \
+    # Gems needed by oxidized-web
+    ruby-charlock-holmes ruby-haml ruby-htmlentities ruby-json \
+    puma ruby-sinatra ruby-sinatra-contrib \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# dependencies for hooks
-RUN gem install aws-sdk slack-api xmpp4r cisco_spark --no-ri --no-rdoc
-
-# dependencies for sources
-RUN gem install gpgme sequel sqlite3 mysql2 --no-ri --no-rdoc
+# gems not available in ubuntu noble
+RUN gem install --no-document \
+    # dependencies for hooks
+    slack-ruby-client cisco_spark \
+    # dependencies for specific inputs
+    net-tftp
 
 # build and install oxidized
 COPY . /tmp/oxidized/
@@ -18,20 +66,15 @@ WORKDIR /tmp/oxidized
 
 # docker automated build gets shallow copy, but non-shallow copy cannot be unshallowed
 RUN git fetch --unshallow || true
-RUN rake install
+
+# Ensure rugged is built with ssh support
+RUN CMAKE_FLAGS='-DUSE_SSH=ON' rake install
 
 # web interface
-RUN gem install oxidized-web --no-ri --no-rdoc
+RUN gem install oxidized-web --no-document
 
 # clean up
 WORKDIR /
 RUN rm -rf /tmp/oxidized
-RUN apt-get -yq --purge autoremove ruby-dev pkg-config make cmake ruby-bundler libssl-dev libssh2-1-dev libicu-dev libsqlite3-dev libmysqlclient-dev
 
-# add runit services
-ADD extra/oxidized.runit /etc/service/oxidized/run
-ADD extra/auto-reload-config.runit /etc/service/auto-reload-config/run
-ADD extra/update-ca-certificates.runit /etc/service/update-ca-certificates/run
-
-VOLUME ["/root/.config/oxidized"]
 EXPOSE 8888/tcp

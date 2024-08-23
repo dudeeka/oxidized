@@ -55,6 +55,24 @@ and within: `~/.gnupg/gpg.conf`
 pinentry-mode loopback
 ```
 
+## Source: JSONFile
+
+One object per device. Supports GPG encryption like the CSV Source.
+
+```yaml
+source:
+  default: jsonfile
+  jsonfile: 
+    file: /var/lib/oxidized/router.json
+    map:
+      name: hostname
+      model: os
+      username: username
+      password: password
+    vars_map:
+      enable: enable
+```
+
 ## Source: SQL
 
  Oxidized uses the `sequel` ruby gem. You can use a variety of databases that aren't explicitly listed. For more information visit https://github.com/jeremyevans/sequel Make sure you have the correct adapter!
@@ -84,6 +102,23 @@ source:
     vars_map:
       enable: enable
 ```
+
+### MySQL with TLS support
+By default SSL is disabled, but if you would like enable connection via TLS add the following configuration:
+```yaml
+source:
+  default: sql
+  sql:
+    ...
+    with_ssl: true
+    ssl_mode: <mode>
+    ssl_ca: <path to CA certificate>
+    ssl_cert: <path to client certificate>
+    ssl_key: <path to client certificate key>
+```
+ssl_mode may be one of the next: disabled / preferred / required / verify_ca / verify_identity
+
+For more information visit: https://github.com/brianmario/mysql2
 
 ## Source: SQLite
 
@@ -148,6 +183,7 @@ source:
     delimiter: !ruby/regexp /:/
     user: username
     pass: password
+    read_timeout: 120
     map:
       name: hostname
       model: os
@@ -168,4 +204,17 @@ source:
     url: https://url/api
     scheme: https
     secure: false
+```
+
+HTTP source also supports pagination. Two settings must be enabled. (`pagination` as a bool and `pagination_key_name` as a string)
+The `pagination_key_name` setting is the key name that an api returns to find the url of the next page.
+
+**Disclaimer**: currently only tested with netbox as the source
+
+```yaml
+source:
+  default: http
+  http:
+    pagination: true
+    pagination_key_name: 'next'
 ```
